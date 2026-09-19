@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>CYBERCAOS :: TERMINAL CMD // COLETIVO ATRAVESSAMENTOS</title>
+  <style>
+    :root {
+      --bg: #030804;
+      --term-green: #00ff66;
+      --term-green-dim: #00aa44;
+      --term-green-glow: rgba(0, 255, 102, 0.4);
+      --term-red: #ff3355;
+      --term-cyan: #00f0ff;
+      --term-yellow: #ffcc00;
+      --font-dos: "Courier New", Courier, "Lucida Console", Monaco, monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      background-color: var(--bg);
+      color: var(--term-green);
+      font-family: var(--font-dos);
+      overflow: hidden;
+    }
+
+    /* Efeito de Tubo CRT e Scanlines */
+    body::before {
+      content: " ";
+      position: fixed;
+      inset: 0;
+      background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.45) 50%),
+                  radial-gradient(circle at center, transparent 65%, rgba(0, 0, 0, 0.85) 100%);
+      background-size: 100% 4px, 100% 100%;
+      pointer-events: none;
+      z-index: 99;
+    }
+
+    /* Linha de varredura animada */
+    body::after {
+      content: " ";
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 6px;
+      background: rgba(0, 255, 102, 0.15);
+      opacity: 0.6;
+      animation: crt-scan 6s linear infinite;
+      pointer-events: none;
+      z-index: 100;
+    }
+
+    @keyframes crt-scan {
+      0% { top: -10px; }
+      100% { top: 100vh; }
+    }
+
+    /* Estrutura da Janela do Terminal */
+    .terminal-container {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      width: 100%;
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 1rem 1.2rem;
+      position: relative;
+      z-index: 10;
+    }
+
+    /* Barra Superior estilo Janela CMD Antiga */
+    .terminal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #003311;
+      border: 1px solid var(--term-green);
+      padding: 0.4rem 0.8rem;
+      font-size: 0.85rem;
+      letter-spacing: 1px;
+      margin-bottom: 0.8rem;
+      box-shadow: 0 0 10px var(--term-green-glow);
+    }
+
+    .terminal-title {
+      font-weight: bold;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .terminal-controls {
+      display: flex;
+      gap: 0.6rem;
+      align-items: center;
+    }
+
+    .btn-sound {
+      background: transparent;
+      border: 1px solid var(--term-green);
+      color: var(--term-green);
+      font-family: var(--font-dos);
+      font-size: 0.75rem;
+      padding: 0.2rem 0.5rem;
+      cursor: pointer;
+      text-transform: uppercase;
+      transition: all 0.2s ease;
+    }
+
+    .btn-sound:hover {
+      background: var(--term-green);
+      color: #000;
+    }
+
+    /* Área de Rolagem do Conteúdo */
+    .terminal-body {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding-right: 0.5rem;
+      font-size: clamp(0.85rem, 2.5vw, 1rem);
+      line-height: 1.5;
+      text-shadow: 0 0 4px var(--term-green-glow);
+      scroll-behavior: smooth;
+    }
+
+    /* Scrollbar retrô */
+    .terminal-body::-webkit-scrollbar {
+      width: 8px;
+    }
+    .terminal-body::-webkit-scrollbar-track {
+      background: #021105;
+      border-left: 1px solid #00441a;
+    }
+    .terminal-body::-webkit-scrollbar-thumb {
+      background: var(--term-green-dim);
+      border: 1px solid var(--term-green);
+    }
+
+    /* Linhas e seções */
+    .term-line {
+      margin-bottom: 0.35rem;
+      word-break: break-word;
+    }
+
+    .term-banner {
+      color: var(--term-cyan);
+      margin-bottom: 1rem;
+      font-weight: bold;
+      border-left: 3px solid var(--term-cyan);
+      padding-left: 0.75rem;
+    }
+
+    .term-highlight {
+      color: #ffffff;
+      font-weight: bold;
+    }
+
+    .term-warning {
+      color: var(--term-yellow);
+    }
+
+    .term-error {
+      color: var(--term-red);
+      font-weight: bold;
+      text-shadow: 0 0 6px rgba(255, 51, 85, 0.6);
+    }
+
+    .term-success {
+      color: #00ffcc;
+      font-weight: bold;
+      text-shadow: 0 0 8px rgba(0, 255, 204, 0.8);
+    }
+
+    .term-prompt-line {
+      color: var(--term-green);
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.4rem;
+      margin-top: 0.5rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .term-path {
+      color: var(--term-cyan);
+      font-weight: bold;
+    }
+
+    /* Container de Entrada Interativa */
+    .interactive-line {
+      display: flex;
+      align-items: center;
+      margin-top: 0.6rem;
+      padding-bottom: 1rem;
+      position: relative;
+    }
+
+    .cmd-prefix {
+      color: var(--term-cyan);
+      font-weight: bold;
+      white-space: nowrap;
+      margin-right: 0.5rem;
+      user-select: none;
+    }
+
+    .cmd-input-wrapper {
+      flex: 1;
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+
+    .cmd-real-input {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      opacity: 0;
+      cursor: text;
+      font-size: 16px; /* Evita zoom automático no iOS */
+      border: none;
+      outline: none;
+      background: transparent;
+      color: transparent;
+      caret-color: transparent;
+    }
+
+    .cmd-visual-text {
+      color: #fff;
+      font-family: var(--font-dos);
+      font-weight: bold;
+      font-size: clamp(0.95rem, 2.8vw, 1.1rem);
+      letter-spacing: 1px;
+      min-height: 1.3rem;
+      word-break: break-all;
+      text-shadow: 0 0 5px rgba(255, 255, 255, 0.7);
+    }
+
+    .cmd-cursor {
+      display: inline-block;
+      width: 10px;
+      height: 1.15rem;
+      background: var(--term-green);
+      margin-left: 2px;
+      vertical-align: text-bottom;
+      animation: blink 0.8s infinite steps(2);
+      box-shadow: 0 0 6px var(--term-green);
+    }
+
+    @keyframes blink {
+      0%, 49% { opacity: 1; }
+      50%, 100% { opacity: 0; }
+    }
+
+    /* Barra de Ações Rápidas Mobile */
+    .quick-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      padding: 0.6rem 0;
+      border-top: 1px dashed var(--term-green-dim);
+      background: rgba(0, 20, 5, 0.8);
+      margin-top: auto;
+    }
+
+    .btn-quick {
+      background: rgba(0, 255, 102, 0.08);
+      border: 1px solid var(--term-green-dim);
+      color: var(--term-green);
+      font-family: var(--font-dos);
+      font-size: 0.8rem;
+      padding: 0.4rem 0.8rem;
+      cursor: pointer;
+      border-radius: 2px;
+      transition: all 0.15s ease;
+    }
+
+    .btn-quick:active, .btn-quick:hover {
+      background: var(--term-green);
+      color: #000;
+      box-shadow: 0 0 8px var(--term-green);
+    }
+
+    .btn-submit-action {
+      margin-left: auto;
+      background: var(--term-green);
+      color: #000;
+      font-weight: bold;
+      border: 1px solid var(--term-green);
+      padding: 0.4rem 1.2rem;
+    }
+
+    .btn-submit-action:hover {
+      background: #fff;
+      border-color: #fff;
+      color: #000;
+    }
+
+    /* Efeito de Glitch quando erra ou acerta */
+    .glitch-flash {
+      animation: flash-shake 0.4s ease;
+    }
+
+    @keyframes flash-shake {
+      0% { transform: translate(0, 0); filter: hue-rotate(90deg); }
+      20% { transform: translate(-6px, 3px); }
+      40% { transform: translate(6px, -3px); filter: invert(0.8); }
+      60% { transform: translate(-4px, 2px); }
+      80% { transform: translate(4px, -2px); }
+      100% { transform: translate(0, 0); filter: none; }
+    }
+
+    /* Efeito de Sucesso e Redirecionamento */
+    .unlock-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 30, 10, 0.95);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 200;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+      padding: 1.5rem;
+      text-align: center;
+    }
+
+    .unlock-overlay.active {
+      opacity: 1;
+      pointer-events: all;
+    }
+
+    .unlock-title {
+      font-size: clamp(1.8rem, 5vw, 3rem);
+      color: #00ffcc;
+      text-shadow: 0 0 20px #00ffcc;
+      margin-bottom: 1rem;
+      font-weight: 900;
+      letter-spacing: 3px;
+    }
+
+    .unlock-text {
+      font-size: clamp(1rem, 3vw, 1.4rem);
+      color: #ffffff;
+      margin-bottom: 2rem;
+      max-width: 600px;
+      line-height: 1.6;
+    }
+
+    .unlock-progress-bar {
+      width: 100%;
+      max-width: 450px;
+      height: 18px;
+      border: 2px solid #00ffcc;
+      padding: 2px;
+      margin-bottom: 1.5rem;
+      box-shadow: 0 0 15px rgba(0, 255, 204, 0.5);
+    }
+
+    .unlock-progress-fill {
+      height: 100%;
+      width: 0%;
+      background: #00ffcc;
+      box-shadow: 0 0 10px #00ffcc;
+      transition: width 2.2s cubic-bezier(0.1, 0.7, 0.1, 1);
+    }
+
+    .btn-redirect-now {
+      background: #00ffcc;
+      color: #000;
+      font-family: var(--font-dos);
+      font-size: 1rem;
+      font-weight: bold;
+      padding: 0.8rem 1.8rem;
+      border: none;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-block;
+      letter-spacing: 2px;
+      box-shadow: 0 0 15px rgba(0, 255, 204, 0.6);
+      transition: all 0.2s ease;
+    }
+
+    .btn-redirect-now:hover {
+      background: #fff;
+      box-shadow: 0 0 25px #fff;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="terminal-container" id="terminalRoot">
+    
+    <!-- Barra Superior -->
+    <header class="terminal-header">
+      <div class="terminal-title">
+        <span>[C:\]</span>
+        <span>CYBERCAOS_CMD.EXE</span>
+      </div>
+      <div class="terminal-controls">
+        <button class="btn-sound" id="btnSoundToggle" onclick="toggleAudio()" title="Ativar/Desativar som do terminal">
+          SOM: ON
+        </button>
+      </div>
+    </header>
+
+    <!-- Histórico do Terminal -->
+    <div class="terminal-body" id="termLog" onclick="focusTerminalInput()">
+      
+      <!-- Banner Inicial do Sistema -->
+      <div class="term-banner">
+        <div>====================================================================</div>
+        <div>CYBERCAOS(R) PERSONAL INTERFACE SYSTEM [Versao 2.0.4.88]</div>
+        <div>(C) COLETIVO ATRAVESSAMENTOS. TODOS OS CORPOS RESERVADOS.</div>
+        <div>JATAI-GO // PROTOCOLO DE RESISTENCIA // NUCLEO EXPOSICAO</div>
+        <div>====================================================================</div>
+      </div>
+
+      <div class="term-line">
+        <span class="term-path">[SISTEMA]:</span> Conexao estabelecida com o dispositivo.
+      </div>
+      <div class="term-line">
+        <span class="term-warning">[ALERTA]:</span> Riscos cyberneticos identificados na exposicao.
+      </div>
+      <div class="term-line" style="margin-top: 0.6rem; color: #ddd;">
+        Há alguma coisa crescendo entre os cabos. Uma criatura? Uma inteligência?<br>
+        Dados fatiam corpos. Corpos atravessam máquinas.
+      </div>
+      <div class="term-line" style="margin-top: 0.6rem; color: var(--term-cyan);">
+        <strong>DIGITE O COMANDO SECRETO DO ENIGMA</strong> para romper as barreiras do sistema.
+      </div>
+      <div class="term-line" style="margin-bottom: 0.8rem; color: var(--term-green-dim); font-size: 0.85rem;">
+        (Comandos uteis: digite <strong>AJUDA</strong> para instrucoes ou <strong>DICA</strong> para pistas)
+      </div>
+
+      <!-- Container onde novas respostas de comandos são adicionadas dinamicamente -->
+      <div id="dynamicHistory"></div>
+
+      <!-- Linha Interativa Atual -->
+      <div class="interactive-line" id="promptAnchor">
+        <span class="cmd-prefix">C:\EXPOSICAO\ENIGMA&gt;</span>
+        <div class="cmd-input-wrapper">
+          <input 
+            type="text" 
+            id="cmdInput" 
+            class="cmd-real-input" 
+            autocomplete="off" 
+            autocorrect="off" 
+            autocapitalize="none" 
+            spellcheck="false"
+            aria-label="Linha de comando do terminal"
+          />
+          <span class="cmd-visual-text" id="cmdVisual"></span>
+          <span class="cmd-cursor"></span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Barra de Atalhos Rápidos para Facilitar em Celulares -->
+    <footer class="quick-actions">
+      <button class="btn-quick" onclick="injectAndExecute('AJUDA')">AJUDA</button>
+      <button class="btn-quick" onclick="injectAndExecute('DICA')">DICA</button>
+      <button class="btn-quick" onclick="injectAndExecute('SOBRE')">SOBRE</button>
+      <button class="btn-quick" onclick="injectAndExecute('LIMPAR')">LIMPAR</button>
+      <button class="btn-quick btn-submit-action" onclick="submitCurrentCommand()">[ ENVIAR ]</button>
+    </footer>
+
+  </div>
+
+  <!-- Tela de Sucesso e Redirecionamento -->
+  <div class="unlock-overlay" id="unlockOverlay">
+    <div class="unlock-title">ACESSO AUTORIZADO</div>
+    <p class="unlock-text">
+      O código secreto foi validado.<br>
+      As máquinas e os corpos se encontraram na fresta.<br>
+      <strong>Atravessando para o portal oficial...</strong>
+    </p>
+    <div class="unlock-progress-bar">
+      <div class="unlock-progress-fill" id="unlockFill"></div>
+    </div>
+    <a href="https://www.coletivoatravessamentos.com.br/" class="btn-redirect-now" id="btnManualRedirect">
+      ENTRAR AGORA &gt;&gt;
+    </a>
+  </div>
+
+  <script>
+    // =========================================================================
+    // CONFIGURAÇÕES DO ENIGMA DA EXPOSIÇÃO
+    // =========================================================================
+    // Aqui você pode definir ou adicionar quantas palavras/frases quiser
+    // que devem ser aceitas como comando correto do enigma:
+    const RESPOSTAS_CORRETAS = [
+      "ALIMENTE A CRIATURA",
+      "ALIMENTEACRIATURA",
+      "ALIMENTAR A CRIATURA",
+      "ATRAVESSAMENTOS",
+      "COLETIVO ATRAVESSAMENTOS",
+      "CRIATURA",
+      "A CRIATURA",
+      "CORPO",
+      "CORPOS"
+    ];
+
+    const URL_DESTINO = "https://www.coletivoatravessamentos.com.br/";
+
+    // =========================================================================
+    // SISTEMA DE ÁUDIO RETRO (Web Audio API - 100% nativo, sem arquivos externos)
+    // =========================================================================
+    let audioEnabled = true;
+    let audioCtx = null;
+
+    function initAudio() {
+      if (!audioCtx) {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (AudioContextClass) {
+          audioCtx = new AudioContextClass();
+        }
+      }
+      if (audioCtx && audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+    }
+
+    function toggleAudio() {
+      audioEnabled = !audioEnabled;
+      const btn = document.getElementById('btnSoundToggle');
+      btn.textContent = audioEnabled ? 'SOM: ON' : 'SOM: OFF';
+      if (audioEnabled) {
+        initAudio();
+        playKeySound();
+      }
+    }
+
+    function playKeySound() {
+      if (!audioEnabled) return;
+      initAudio();
+      if (!audioCtx) return;
+      try {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(600 + Math.random() * 200, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.02, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.04);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.05);
+      } catch (e) {}
+    }
+
+    function playErrorSound() {
+      if (!audioEnabled) return;
+      initAudio();
+      if (!audioCtx) return;
+      try {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(140, audioCtx.currentTime);
+        osc.frequency.linearRampToValueAtTime(80, audioCtx.currentTime + 0.3);
+        gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.35);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.36);
+      } catch (e) {}
+    }
+
+    function playSuccessSound() {
+      if (!audioEnabled) return;
+      initAudio();
+      if (!audioCtx) return;
+      try {
+        const notes = [440, 554.37, 659.25, 880];
+        notes.forEach((freq, idx) => {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(freq, audioCtx.currentTime + idx * 0.12);
+          gain.gain.setValueAtTime(0.08, audioCtx.currentTime + idx * 0.12);
+          gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + idx * 0.12 + 0.3);
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start(audioCtx.currentTime + idx * 0.12);
+          osc.stop(audioCtx.currentTime + idx * 0.12 + 0.35);
+        });
+      } catch (e) {}
+    }
+
+    // =========================================================================
+    // LÓGICA DO TERMINAL INTERATIVO
+    // =========================================================================
+    const cmdInput = document.getElementById('cmdInput');
+    const cmdVisual = document.getElementById('cmdVisual');
+    const dynamicHistory = document.getElementById('dynamicHistory');
+    const termLog = document.getElementById('termLog');
+    const terminalRoot = document.getElementById('terminalRoot');
+    const unlockOverlay = document.getElementById('unlockOverlay');
+    const unlockFill = document.getElementById('unlockFill');
+
+    // Mantém o input visível sincronizado com o campo real
+    cmdInput.addEventListener('input', (e) => {
+      cmdVisual.textContent = cmdInput.value;
+      playKeySound();
+      scrollToBottom();
+    });
+
+    // Submissão com a tecla ENTER
+    cmdInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        submitCurrentCommand();
+      }
+    });
+
+    function focusTerminalInput() {
+      cmdInput.focus();
+      initAudio();
+    }
+
+    function scrollToBottom() {
+      termLog.scrollTop = termLog.scrollHeight;
+    }
+
+    // Utilitário para limpar acentos e pontuação ao verificar
+    function normalizeText(str) {
+      return str
+        .toUpperCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '') // remove acentos
+        .replace(/[^A-Z0-9\s]/g, '')      // mantém apenas letras, números e espaços
+        .trim();
+    }
+
+    function appendLine(htmlContent) {
+      const line = document.createElement('div');
+      line.className = 'term-line';
+      line.innerHTML = htmlContent;
+      dynamicHistory.appendChild(line);
+      scrollToBottom();
+    }
+
+    function submitCurrentCommand() {
+      const rawText = cmdInput.value;
+      const cleanText = rawText.trim();
+      
+      if (!cleanText) return;
+
+      // 1. Exibe a linha do comando digitado no histórico
+      appendLine(`<span class="term-path">C:\\EXPOSICAO\\ENIGMA&gt;</span> <span class="term-highlight">${escapeHtml(rawText)}</span>`);
+
+      // 2. Limpa o input imediatamente
+      cmdInput.value = '';
+      cmdVisual.textContent = '';
+
+      // 3. Processa o comando
+      processCommand(cleanText);
+      scrollToBottom();
+    }
+
+    function injectAndExecute(cmd) {
+      cmdInput.value = cmd;
+      cmdVisual.textContent = cmd;
+      submitCurrentCommand();
+      focusTerminalInput();
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    function processCommand(input) {
+      const normalizedInput = normalizeText(input);
+
+      // Checa se o comando é um dos comandos do enigma correto
+      const isEnigmaSolved = RESPOSTAS_CORRETAS.some(resposta => {
+        const normAns = normalizeText(resposta);
+        return normalizedInput === normAns || normalizedInput.includes(normAns);
+      });
+
+      if (isEnigmaSolved) {
+        handleEnigmaSuccess(input);
+        return;
+      }
+
+      // Comandos utilitários padrão do CMD
+      switch (normalizedInput) {
+        case 'AJUDA':
+        case 'HELP':
+        case '?':
+          appendLine(`
+            <div style="margin: 0.5rem 0; color: var(--term-cyan);">
+              <div>----------------------------------------------------------------</div>
+              <div class="term-highlight">COMANDOS DISPONIVEIS NO TERMINAL:</div>
+              <div>  <strong>[COMANDO DO ENIGMA]</strong> : Digite a palavra ou frase secreta</div>
+              <div>  <strong>AJUDA</strong>                : Exibe esta lista de comandos</div>
+              <div>  <strong>DICA</strong>                 : Revela uma pista sobre o enigma</div>
+              <div>  <strong>SOBRE</strong>                : Informacoes sobre o Coletivo Atravessamentos</div>
+              <div>  <strong>STATUS</strong>               : Diagnostico do sistema cybernetico</div>
+              <div>  <strong>LIMPAR</strong> ou <strong>CLS</strong>       : Limpa a tela do terminal</div>
+              <div>----------------------------------------------------------------</div>
+            </div>
+          `);
+          break;
+
+        case 'DICA':
+        case 'PISTA':
+        case 'HINT':
+          appendLine(`
+            <div style="margin: 0.5rem 0; color: var(--term-yellow);">
+              <div>[PISTA DO ENIGMA DA EXPOSICAO]:</div>
+              <div>"Dados fatiam corpos. Corpos atravessam máquinas.</div>
+              <div>Há alguma coisa crescendo entre os cabos.</div>
+              <div>O aviso final no telão exige: <strong>Alimente a... ?</strong>"</div>
+            </div>
+          `);
+          break;
+
+        case 'SOBRE':
+        case 'INFO':
+        case 'COLETIVO':
+          appendLine(`
+            <div style="margin: 0.5rem 0;">
+              <div class="term-highlight">COLETIVO ATRAVESSAMENTOS</div>
+              <div>Corpo coletivo que escuta, sonha e age.</div>
+              <div>Nascido em Jataí-GO. Atua entre educação, arte, decolonialidade e justiça social.</div>
+              <div>Ponto de Cultura Certificado sob a rede Cultura Viva (ID 13233982).</div>
+              <div>Site: <span style="color: var(--term-cyan);">https://www.coletivoatravessamentos.com.br/</span></div>
+            </div>
+          `);
+          break;
+
+        case 'STATUS':
+        case 'DIAG':
+          appendLine(`
+            <div style="margin: 0.5rem 0; color: var(--term-cyan);">
+              <div>[DIAGNOSTICO DO SISTEMA CYBERCAOS]:</div>
+              <div>- Nucleo: SEC_FAULT // LEVEL_0</div>
+              <div>- Entropia: 98.4% (CRITICA)</div>
+              <div>- Estado: AGUARDANDO COMANDO DE LIBERACAO</div>
+              <div>- Protocolo Atravessamentos: BLOQUEADO (REQUER CHAVE)</div>
+            </div>
+          `);
+          break;
+
+        case 'LIMPAR':
+        case 'CLS':
+        case 'CLEAR':
+          dynamicHistory.innerHTML = '';
+          break;
+
+        case 'SAIR':
+        case 'EXIT':
+          appendLine(`
+            <div class="term-warning">A opcao NAO / SAIR nao esta disponivel neste momento. O sistema exige travessia.</div>
+          `);
+          break;
+
+        default:
+          // Comando incorreto
+          handleCommandError(input);
+          break;
+      }
+    }
+
+    function handleCommandError(input) {
+      playErrorSound();
+      terminalRoot.classList.add('glitch-flash');
+      setTimeout(() => {
+        terminalRoot.classList.remove('glitch-flash');
+      }, 400);
+
+      appendLine(`
+        <div class="term-error">
+          [X] COMANDO NAO RECONHECIDO: "${escapeHtml(input)}"<br>
+          ACESSO NEGADO. O enigma permanece oculto na exposicao.<br>
+          <span style="font-size:0.85rem; color: #ff99aa;">&gt; Verifique a frase na tela da exposicao ou digite <strong>DICA</strong>.</span>
+        </div>
+      `);
+    }
+
+    function handleEnigmaSuccess(input) {
+      playSuccessSound();
+      
+      appendLine(`
+        <div class="term-success" style="margin: 0.8rem 0;">
+          <div>[+] VERIFICANDO ASSINATURA CRIPTOGRAFICA...</div>
+          <div>[+] CHAVE CORRETA: "${escapeHtml(input.toUpperCase())}" VALIDADA!</div>
+          <div>[+] PROTOCOLO ATRAVESSAMENTOS ATIVADO.</div>
+          <div>[+] REDIRECIONANDO PARA O COLETIVO ATRAVESSAMENTOS...</div>
+        </div>
+      `);
+
+      // Mostra o overlay de transição dramático
+      setTimeout(() => {
+        unlockOverlay.classList.add('active');
+        unlockFill.style.width = '100%';
+
+        // Redirecionamento automático após 2.4s
+        setTimeout(() => {
+          window.location.href = URL_DESTINO;
+        }, 2400);
+      }, 800);
+    }
+
+    // Inicialização ao carregar a página
+    window.addEventListener('load', () => {
+      focusTerminalInput();
+      
+      // Garante foco em dispositivos touch ao tocar na área do terminal
+      document.body.addEventListener('click', (e) => {
+        if (!e.target.closest('button') && !e.target.closest('a')) {
+          focusTerminalInput();
+        }
+      });
+    });
+  </script>
+</body>
+</html>
